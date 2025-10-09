@@ -189,9 +189,7 @@ class ClusterBasedDroneRouting_Hybrid:
         # Initialize population with random permutations
         population = [random.sample(cluster_hotspots, len(cluster_hotspots)) 
                      for _ in range(population_size)]
-        
-        print(f"  [Hybrid] Cluster {cluster_id}: Starting GA+LS with {len(cluster_hotspots)} hotspots")
-        
+                
         # HYBRID EVOLUTION LOOP
         for gen in range(generations):
             # Standard GA operations
@@ -221,10 +219,8 @@ class ClusterBasedDroneRouting_Hybrid:
                 # Get best distance for monitoring
                 best_route_so_far = population[0]
                 best_dist = self._route_distance([start_point] + best_route_so_far + [start_point])
-                print(f"    Gen {gen+1}/{generations}: Best distance = {best_dist:.2f} km (after LS)")
         
         # FINAL INTENSIVE LOCAL SEARCH
-        print(f"  [Hybrid] Applying final intensive 2-opt refinement...")
         population.sort(key=lambda r: self._route_distance_segment(r))
         best_route = self._local_search_2opt(
             population[0], 
@@ -233,7 +229,6 @@ class ClusterBasedDroneRouting_Hybrid:
         
         final_route = [start_point] + best_route + [start_point]
         final_distance = self._route_distance(final_route)
-        print(f"  [Hybrid] Final optimized distance: {final_distance:.2f} km")
         
         return final_route
     
@@ -254,13 +249,11 @@ class ClusterBasedDroneRouting_Hybrid:
         
         for cluster_id in range(self.n_clusters):
             n_drones = self.drones_per_cluster.get(cluster_id, 1)
-            print(f"\nCluster {cluster_id}: {n_drones} drone(s)")
             cluster_routes = []
             
             if n_drones > 1:
                 groups = self.split_hotspots_for_cluster(cluster_id, n_drones)
                 for drone_idx, group in enumerate(groups):
-                    print(f"  Drone {drone_idx+1}:")
                     route = self.solve_tsp_hybrid(
                         cluster_id, 
                         hotspot_indices=group,
