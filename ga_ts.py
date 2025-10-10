@@ -2,10 +2,15 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
-import random, math
+import random
 from ts import ClusterBasedDroneRoutingTS
-from ga import ClusterBasedDroneRouting  # pastikan file GA kamu bernama ga.py
+from ga import ClusterBasedDroneRouting
 from collections import deque
+import folium
+from folium import plugins
+from bs4 import BeautifulSoup
+import re
+from IPython.display import display, display_html
 
 class HybridGATabuDroneRouting(ClusterBasedDroneRouting):
     def __init__(self, csv_file, road_points, n_drones=None,
@@ -648,43 +653,97 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
                 print(f"  Drone {d_idx+1} Route: {route}")
                 print(f"    Total distance: {total_distance:.2f} km | Time: {flight_time_min:.2f} min {valid}")
 
-    def visualize_cluster_routes(self, all_routes):
-        plt.figure(figsize=(14, 10))
-        colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
-        markers = ['o', 's', '^', 'D', 'v', 'P', '*', 'X']
-        linestyles = ['-', '--', '-.', ':']
+    def visualize_cluster_routes(self, all_routes,
+                             base_map_path="forest_fire_clusters_map.html",
+                             output_path="forest_fire_clusters_with_drone_routes.html"):
 
-        for i, (lat, lon) in enumerate(self.road_points):
-            plt.scatter(lon, lat, c='black', s=200, marker='s', zorder=5)
-            plt.text(lon, lat, f'R{i}', ha='center', va='center', fontweight='bold', color='white')
+        # === 1️⃣ Baca peta dasar ===
+        with open(base_map_path, "r", encoding="utf-8") as f:
+            html_data = f.read()
 
-        for i, (lat, lon) in enumerate(self.coordinates):
-            cid = self.clusters[i]
-            plt.scatter(lon, lat, c=colors[cid % len(colors)], s=100, alpha=0.7, zorder=4)
-            plt.text(lon, lat, f'H{i}', ha='center', va='center', fontsize=8, fontweight='bold')
+        soup = BeautifulSoup(html_data, "html.parser")
 
+        # === 2️⃣ Deteksi variabel map Folium (contoh: map_fa9a...) ===
+        map_var_match = re.search(r"var\s+(map_[a-z0-9]+)\s*=", html_data)
+        if not map_var_match:
+            print("❌ Tidak ditemukan variabel peta di file HTML.")
+            return
+        map_var = map_var_match.group(1)
+        print(f"✅ Variabel peta terdeteksi: {map_var}")
+
+        # === 3️⃣ Warna kombinasi kustom per cluster ===
+        cluster_color_palettes = {
+            0: ["#432323", "#D7A86E"],  # merah tua & hijau tua
+            1: ["#59AC77", "#6F00FF"],  # hijau muda & ungu terang
+            2: ["#F25912", "#5C3E94"],  # oranye & ungu tua
+        }
+
+        legend_entries = []
+        js_add_routes = "\n\n// === Tambahan: Drone Route Overlays ===\n"
+
+        # === 4️⃣ Tambahkan PolyLine putus-putus per drone ===
         for cid, routes in all_routes.items():
+            palette = cluster_color_palettes.get(cid, ["#555555", "#AAAAAA"])  # fallback abu-abu
             for d_idx, route in enumerate(routes):
                 if len(route) <= 1:
                     continue
-                lats, lons = [], []
+
+                # ambil koordinat
+                latlons = []
                 for loc in route:
                     if loc < len(self.road_points):
                         lat, lon = self.road_points[loc]
                     else:
                         lat, lon = self.coordinates[loc - len(self.road_points)]
-                    lats.append(lat)
-                    lons.append(lon)
-                color = colors[cid % len(colors)]
-                linestyle = linestyles[d_idx % len(linestyles)]
-                plt.plot(lons, lats, linestyle=linestyle, marker=markers[d_idx % len(markers)],
-                         color=color, linewidth=2, markersize=6,
-                         label=f'Cluster {cid} Drone {d_idx+1}')
+                    latlons.append([lat, lon])
 
-        plt.title('Drone Routes (Optimized GA + Tabu Search with Elitism)')
-        plt.xlabel('Longitude')
-        plt.ylabel('Latitude')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        plt.show()
+                color = palette[d_idx % len(palette)]
+
+                js_add_routes += f"""
+    var droneRoute_{cid}_{d_idx} = L.polyline({latlons}, {{
+        color: '{color}',
+        weight: 3,
+        opacity: 0.9,
+        dashArray: '10, 10'  // garis putus-putus
+    }}).addTo({map_var});
+    droneRoute_{cid}_{d_idx}.bindTooltip("Cluster {cid} - Drone {d_idx+1}");
+    """
+
+                legend_entries.append((f"Cluster {cid} - Drone {d_idx+1}", color))
+
+        js_add_routes += "\n// === End of Drone Routes ===\n"
+
+        # === 5️⃣ Tambahkan legenda ke peta ===
+        legend_html = '''
+        <div style="
+            position: fixed; bottom: 30px; left: 20px; width: 270px;
+            background-color: white; border:2px solid grey; z-index:9999;
+            font-size:13px; padding: 10px; line-height: 1.4;">
+            <b>Legenda Rute Drone ✈️</b><br>
+            <hr style="margin:4px 0;">
+        '''
+        for label, color in legend_entries:
+            legend_html += f'<div><span style="background-color:{color};width:18px;height:10px;display:inline-block;margin-right:6px;"></span>{label}</div>'
+        legend_html += "<hr style='margin:6px 0;'>Garis putus-putus: Jalur Udara</div>"
+
+        js_add_routes += f"""
+    var legend = L.control({{position: 'bottomleft'}});
+    legend.onAdd = function (map) {{
+        var div = L.DomUtil.create('div', 'info legend');
+        div.innerHTML = `{legend_html}`;
+        return div;
+    }};
+    legend.addTo({map_var});
+    """
+
+        # === 6️⃣ Sisipkan JS ke HTML terakhir ===
+        script_tag = soup.find_all("script")[-1]
+        script_content = script_tag.string or ""
+        script_tag.string = script_content + js_add_routes
+
+        # === 7️⃣ Simpan hasil baru ===
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(str(soup))
+
+        print(f"✅ Drone routes (warna kustom + legenda) berhasil ditambahkan ke peta: {output_path}")
+        display_html(output_path)

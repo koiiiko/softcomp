@@ -3,6 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math, random
 from sklearn.cluster import KMeans
+import folium
+from folium import plugins
+from bs4 import BeautifulSoup
+import re
+from IPython.display import display, display_html
 
 class ClusterBasedDroneRoutingTS:
     def __init__(self, csv_file=None, road_points=None, n_drones=None):
@@ -131,36 +136,96 @@ class ClusterBasedDroneRoutingTS:
         return all_routes
 
     # ---------- Visualization ----------
-    def visualize_cluster_routes(self, all_routes):
-        plt.figure(figsize=(14, 10))
-        colors = ['red','blue','green','orange','purple','brown','pink','gray']
+    def visualize_cluster_routes(self, all_routes, base_map_path="forest_fire_clusters_map.html", output_path="forest_fire_clusters_with_tabu_routes.html"):
+        # === 1️⃣ Baca peta dasar ===
+        with open(base_map_path, "r", encoding="utf-8") as f:
+            html_data = f.read()
+        soup = BeautifulSoup(html_data, "html.parser")
 
-        # depot
-        for i,(lat,lon) in enumerate(self.road_points):
-            plt.scatter(lon, lat, c='black', s=200, marker='s')
-            plt.text(lon, lat, f'R{i}', ha='center', va='center', color='white', fontweight='bold')
+        # === 2️⃣ Deteksi variabel map Leaflet ===
+        map_var_match = re.search(r"var\s+(map_[a-z0-9]+)\s*=", html_data)
+        if not map_var_match:
+            print("❌ Tidak ditemukan variabel peta di file HTML.")
+            return
+        map_var = map_var_match.group(1)
+        print(f"✅ Variabel peta terdeteksi: {map_var}")
 
-        # hotspots
-        for i,(lat,lon) in enumerate(self.coordinates):
-            cid=self.clusters[i]
-            plt.scatter(lon, lat, c=colors[cid%len(colors)], s=100, alpha=0.7)
-            plt.text(lon, lat, f'H{i}', ha='center', va='center', fontsize=8)
+        # === 3️⃣ Warna kustom per cluster ===
+        cluster_color_palettes = {
+            0: ["#432323", "#D7A86E"],  # merah tua & kuning lembut
+            1: ["#59AC77", "#6F00FF"],  # hijau muda & ungu terang
+            2: ["#F25912", "#5C3E94"],  # oranye & ungu tua
+        }
 
-        # routes
-        for cid,routes in all_routes.items():
-            for d_idx,(route, hotspot_indices) in enumerate(routes):
-                if len(route)<=1: continue
-                lats,lons=[],[]
-                locs = [self.road_points[cid]]+[self.coordinates[i] for i in hotspot_indices]
+        legend_entries = []
+        js_add_routes = "\n\n// === Tambahan: Drone Route Overlays (Tabu Search) ===\n"
+
+        # === 4️⃣ Loop per cluster dan drone ===
+        for cid, routes in all_routes.items():
+            palette = cluster_color_palettes.get(cid, ["#555555", "#AAAAAA"])
+            for d_idx, (route, hotspot_indices) in enumerate(routes):
+                if len(route) <= 1:
+                    continue
+
+                latlons = []
                 for loc in route:
-                    lat,lon = locs[loc]
-                    lats.append(lat); lons.append(lon)
-                plt.plot(lons,lats,'o-',color=colors[cid%len(colors)],
-                         label=f'Cluster {cid} Drone {d_idx+1}')
+                    if loc == 0:  # depot
+                        lat, lon = self.road_points[cid]
+                    else:
+                        # gunakan indeks hotspot sebenarnya
+                        hotspot_idx = hotspot_indices[loc - 1]
+                        lat, lon = self.coordinates[hotspot_idx]
+                    latlons.append([lat, lon])
 
-        plt.title("Drone Routes (Tabu Search)")
-        plt.xlabel("Longitude"); plt.ylabel("Latitude")
-        plt.legend(); plt.grid(True,alpha=0.3); plt.show()
+                color = palette[d_idx % len(palette)]
+
+                js_add_routes += f"""
+    var droneRoute_{cid}_{d_idx} = L.polyline({latlons}, {{
+        color: '{color}',
+        weight: 3,
+        opacity: 0.9,
+        dashArray: '10, 10'
+    }}).addTo({map_var});
+    droneRoute_{cid}_{d_idx}.bindTooltip("Cluster {cid} - Drone {d_idx+1}");
+    """
+                legend_entries.append((f"Cluster {cid} - Drone {d_idx+1}", color))
+
+        js_add_routes += "\n// === End of Drone Routes ===\n"
+
+        # === 5️⃣ Tambahkan legenda ===
+        legend_html = '''
+        <div style="
+            position: fixed; bottom: 30px; left: 20px; width: 270px;
+            background-color: white; border:2px solid grey; z-index:9999;
+            font-size:13px; padding: 10px; line-height: 1.4;">
+            <b>Legenda Rute Drone ✈️</b><br>
+            <hr style="margin:4px 0;">
+        '''
+        for label, color in legend_entries:
+            legend_html += f'<div><span style="background-color:{color};width:18px;height:10px;display:inline-block;margin-right:6px;"></span>{label}</div>'
+        legend_html += "<hr style='margin:6px 0;'>Garis putus-putus: Jalur Udara</div>"
+
+        js_add_routes += f"""
+    var legend = L.control({{position: 'bottomleft'}});
+    legend.onAdd = function (map) {{
+        var div = L.DomUtil.create('div', 'info legend');
+        div.innerHTML = `{legend_html}`;
+        return div;
+    }};
+    legend.addTo({map_var});
+    """
+
+        # === 6️⃣ Sisipkan JS ke file HTML ===
+        script_tag = soup.find_all("script")[-1]
+        script_content = script_tag.string or ""
+        script_tag.string = script_content + js_add_routes
+
+        # === 7️⃣ Simpan hasil baru ===
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(str(soup))
+
+        print(f"✅ Rute drone (Tabu Search Only) berhasil ditambahkan ke peta: {output_path}")
+
 
     # ---------- Print ----------
     def print_cluster_routes(self, all_routes):
