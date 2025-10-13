@@ -747,3 +747,377 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
 
         print(f"✅ Drone routes (warna kustom + legenda) berhasil ditambahkan ke peta: {output_path}")
         display_html(output_path)
+
+class ClusterBasedDroneRoutingHybridTabuMelawi:
+    drone_speed = 30
+    max_flight_time = 170  # minutes
+    max_distance = (drone_speed * max_flight_time * 60) / 1000
+    penalty_factor = 100
+
+    def __init__(self, csv_file=None, road_points=None, n_drones=None,
+                 tabu_on_children=True, tabu_tenure=15, tabu_budget=50):
+        self.df = pd.read_csv(csv_file)
+
+        # ✅ Konversi cluster 1-based → 0-based
+        if self.df["Cluster"].min() == 1:
+            print("⚙️ Cluster numbering detected as 1-based → converting to 0-based internally.")
+            self.df["Cluster"] = self.df["Cluster"] - 1
+
+        self.coordinates = list(zip(self.df['Latitude'], self.df['Longitude']))
+        self.clusters = self.df['Cluster'].tolist()
+        self.n_clusters = max(self.clusters) + 1
+
+        # Drone distribution
+        if n_drones is None:
+            self.drones_per_cluster = {cid: 1 for cid in range(self.n_clusters)}
+        elif isinstance(n_drones, int):
+            self.drones_per_cluster = {cid: n_drones for cid in range(self.n_clusters)}
+        elif isinstance(n_drones, dict):
+            self.drones_per_cluster = {cid: n_drones.get(cid, 1) for cid in range(self.n_clusters)}
+        else:
+            raise ValueError("n_drones must be None, int, or dict")
+
+        # Road points (depots)
+        if isinstance(road_points, dict):
+            self.road_points = [road_points[k] for k in sorted(road_points.keys())]
+        else:
+            self.road_points = list(road_points)
+
+        while len(self.road_points) < self.n_clusters:
+            self.road_points.append(self.road_points[0])
+
+        # Parameters
+        self.tabu_on_children = tabu_on_children
+        self.tabu_tenure = tabu_tenure
+        self.tabu_budget = tabu_budget
+
+        # Distance matrix
+        self.all_locations = self.road_points + self.coordinates
+        self.n_total_locations = len(self.all_locations)
+        self.dist_matrix = self._calculate_distance_matrix()
+
+    # ------------------ Utility ------------------
+    def _calculate_distance_matrix(self):
+        dist = np.zeros((self.n_total_locations, self.n_total_locations))
+        for i in range(self.n_total_locations):
+            for j in range(self.n_total_locations):
+                if i != j:
+                    lat1, lon1 = self.all_locations[i]
+                    lat2, lon2 = self.all_locations[j]
+                    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+                    dlat = lat2 - lat1
+                    dlon = lon2 - lon1
+                    a = np.sin(dlat/2)**2 + np.cos(lat1)*np.cos(lat2)*np.sin(dlon/2)**2
+                    c = 2*np.arcsin(np.sqrt(a))
+                    dist[i][j] = 6371 * c
+        return dist
+
+    def _route_distance(self, route):
+        return sum(self.dist_matrix[route[i]][route[i+1]] for i in range(len(route)-1))
+
+    def _fitness(self, route):
+        distance = self._route_distance(route)
+        penalty = 0
+        if distance > self.max_distance:
+            penalty = (distance - self.max_distance) * self.penalty_factor
+        return distance + penalty
+
+    # ------------------ GA Components ------------------
+    def _tournament_selection(self, population, k=3):
+        chosen = random.sample(population, min(k, len(population)))
+        chosen.sort(key=lambda r: self._fitness(r))
+        return chosen[0]
+
+    def _order_crossover(self, parent1, parent2):
+        if len(parent1) < 2:
+            return parent1[:]
+        size = len(parent1)
+        start, end = sorted(random.sample(range(size), 2))
+        child = [None] * size
+        child[start:end] = parent1[start:end]
+        p2_elements = [x for x in parent2 if x not in child]
+        idx = 0
+        for i in range(size):
+            if child[i] is None:
+                child[i] = p2_elements[idx]
+                idx += 1
+        return child
+
+    def _mutate(self, route, mutation_rate=0.1):
+        route = route[:]
+        if len(route) > 1 and random.random() < mutation_rate:
+            i, j = random.sample(range(len(route)), 2)
+            route[i], route[j] = route[j], route[i]
+        return route
+
+    # ------------------ Tabu Search ------------------
+    def _tabu_search(self, route, tabu_tenure=None, max_iter=None):
+        if tabu_tenure is None:
+            tabu_tenure = self.tabu_tenure
+        if max_iter is None:
+            max_iter = self.tabu_budget
+
+        best = route
+        best_fit = self._fitness(best)
+        current = best[:]
+        tabu_list = deque(maxlen=tabu_tenure)
+        best_global = best[:]
+        best_global_fit = best_fit
+        no_improve = 0
+
+        for _ in range(max_iter):
+            n = len(current)
+            neighbors = []
+            for _ in range(min(30, (n*(n-1))//2)):
+                i, j = random.sample(range(1, n-1), 2)
+                new = current[:]
+                new[i], new[j] = new[j], new[i]
+                move = (i, j)
+                if move not in tabu_list:
+                    neighbors.append((new, move))
+
+            if not neighbors:
+                break
+
+            best_neighbor, best_move = min(neighbors, key=lambda x: self._fitness(x[0]))
+            best_neighbor_fit = self._fitness(best_neighbor)
+
+            tabu_list.append(best_move)
+            current = best_neighbor
+
+            if best_neighbor_fit < best_global_fit:
+                best_global = best_neighbor[:]
+                best_global_fit = best_neighbor_fit
+                no_improve = 0
+            else:
+                no_improve += 1
+
+            if no_improve > 15:
+                random.shuffle(current[1:-1])
+                no_improve = 0
+
+        return best_global
+
+    # ------------------ Hybrid GA + Tabu ------------------
+    def solve_tsp_hybrid(self, cluster_id, hotspot_indices=None, population_size=40, generations=100, mutation_rate=0.1):
+        if hotspot_indices is None:
+            cluster_hotspots = [i + len(self.road_points) for i, c in enumerate(self.clusters) if c == cluster_id]
+        else:
+            cluster_hotspots = [i + len(self.road_points) for i in hotspot_indices]
+
+        if not cluster_hotspots:
+            return []
+        if len(cluster_hotspots) == 1:
+            return [cluster_id] + cluster_hotspots + [cluster_id]
+
+        start_point = cluster_id
+        population = [random.sample(cluster_hotspots, len(cluster_hotspots)) for _ in range(population_size)]
+
+        for _ in range(generations):
+            new_population = []
+            elite = min(population, key=lambda r: self._fitness([start_point] + r + [start_point]))
+
+            for _ in range(population_size):
+                p1 = self._tournament_selection(population)
+                p2 = self._tournament_selection(population)
+                child = self._order_crossover(p1, p2)
+                child = self._mutate(child, mutation_rate)
+
+                if self.tabu_on_children and random.random() < 0.2:
+                    improved = self._tabu_search([start_point] + child + [start_point])
+                    child = improved[1:-1]
+
+                new_population.append(child)
+
+            new_population[0] = elite
+            population = new_population
+
+        best_route = min(population, key=lambda r: self._fitness([start_point] + r + [start_point]))
+        return [start_point] + best_route + [start_point]
+
+    # ------------------ Cluster-level Optimization ------------------
+    def optimize_all_clusters(self, population_size=40, generations=100, mutation_rate=0.1):
+        all_routes = {}
+        for cid in range(self.n_clusters):
+            n_drones = self.drones_per_cluster.get(cid, 1)
+            cluster_routes = []
+            if n_drones > 1:
+                groups = self._split_hotspots_for_cluster(cid, n_drones)
+                for g in groups:
+                    route = self.solve_tsp_hybrid(cid, hotspot_indices=g,
+                                                  population_size=population_size,
+                                                  generations=generations,
+                                                  mutation_rate=mutation_rate)
+                    cluster_routes.append(route)
+            else:
+                route = self.solve_tsp_hybrid(cid,
+                                              population_size=population_size,
+                                              generations=generations,
+                                              mutation_rate=mutation_rate)
+                cluster_routes = [route]
+            all_routes[cid] = cluster_routes
+        return all_routes
+
+    def _split_hotspots_for_cluster(self, cluster_id, n_drones):
+        indices = [i for i, c in enumerate(self.clusters) if c == cluster_id]
+        if not indices:
+            return []
+        coords = np.array([self.coordinates[i] for i in indices])
+        if len(indices) <= n_drones:
+            return [[idx] for idx in indices] + [[] for _ in range(n_drones - len(indices))]
+        kmeans = KMeans(n_clusters=n_drones, random_state=42, n_init=10)
+        labels = kmeans.fit_predict(coords)
+        groups = [[] for _ in range(n_drones)]
+        for idx, label in zip(indices, labels):
+            groups[label].append(idx)
+        return groups
+
+    # ------------------ Output ------------------
+    def print_cluster_routes(self, all_routes):
+        print("\n=== DRONE ROUTES (Hybrid GA + Tabu Search, Melawi) ===")
+        for cid, routes in all_routes.items():
+            num_drones = self.drones_per_cluster.get(cid, 1)
+            print(f"\nCluster {cid+1} (Drones: {num_drones}):")
+            road_lat, road_lon = self.road_points[cid]
+            print(f"  Start from depot: ({road_lat:.5f}, {road_lon:.5f})")
+
+            for d_idx, route in enumerate(routes):
+                if len(route) <= 1:
+                    print(f"  Drone {d_idx+1}: No hotspots assigned")
+                    continue
+                total_distance = self._route_distance(route)
+                flight_time_min = total_distance * 1000 / self.drone_speed / 60
+                valid = "" if flight_time_min <= self.max_flight_time else "⚠️ Exceeds Limit!"
+                print(f"  Drone {d_idx+1} Route: {route}")
+                print(f"    Total distance: {total_distance:.2f} km | Time: {flight_time_min:.2f} min {valid}")
+    
+    # def visualize_cluster_routes(self, all_routes):
+    #     plt.figure(figsize=(14, 10))
+    #     colors = ['red','blue','green','orange','purple','brown','pink','gray']
+
+    #     for i, (lat, lon) in enumerate(self.road_points):
+    #         plt.scatter(lon, lat, c='black', s=200, marker='s', zorder=5)
+    #         plt.text(lon, lat, f'R{i+1}', ha='center', va='center', fontweight='bold', fontsize=12, color='white')
+
+    #     for i, (lat, lon) in enumerate(self.coordinates):
+    #         cid = self.clusters[i]
+    #         plt.scatter(lon, lat, c=colors[cid % len(colors)], s=80, alpha=0.7, zorder=4)
+
+    #     for cid, routes in all_routes.items():
+    #         for d_idx, route in enumerate(routes):
+    #             if len(route) <= 1:
+    #                 continue
+    #             lats, lons = [], []
+    #             for loc in route:
+    #                 if loc < len(self.road_points):
+    #                     lat, lon = self.road_points[loc]
+    #                 else:
+    #                     lat, lon = self.coordinates[loc - len(self.road_points)]
+    #                 lats.append(lat)
+    #                 lons.append(lon)
+    #             plt.plot(lons, lats, 'o-', color=colors[cid % len(colors)],
+    #                     label=f'Cluster {cid+1} Drone {d_idx+1}', linewidth=2, markersize=6)
+
+    #     plt.title('Hybrid GA + Tabu Search (Melawi)', fontsize=14)
+    #     plt.xlabel('Longitude')
+    #     plt.ylabel('Latitude')
+    #     plt.legend()
+    #     plt.grid(True, alpha=0.3)
+    #     plt.tight_layout()
+    #     plt.show()
+    def visualize_cluster_routes(self, all_routes, base_map_path="forest_fire_clusters_map_melawi.html", output_path="forest_fire_clusters_with_ga_tabu_routes_melawi.html"):
+        from bs4 import BeautifulSoup
+        import re
+
+        # === 1️⃣ Baca peta dasar ===
+        try:
+            with open(base_map_path, "r", encoding="utf-8") as f:
+                html_data = f.read()
+        except FileNotFoundError:
+            print(f"❌ File peta dasar tidak ditemukan: {base_map_path}")
+            return
+
+        soup = BeautifulSoup(html_data, "html.parser")
+
+        # === 2️⃣ Deteksi variabel map Leaflet ===
+        map_var_match = re.search(r"var\s+(map_[a-z0-9]+)\s*=", html_data)
+        if not map_var_match:
+            print("❌ Tidak ditemukan variabel peta di file HTML.")
+            return
+        map_var = map_var_match.group(1)
+        print(f"✅ Variabel peta terdeteksi: {map_var}")
+
+        # === 3️⃣ Warna kustom per cluster (Melawi: 4 cluster) ===
+        cluster_color_palettes = {
+            0: ["#A93226", "#E74C3C"],  # Cluster 1
+            1: ["#1E8449", "#52BE80"],  # Cluster 2
+            2: ["#2471A3", "#85C1E9"],  # Cluster 3
+            3: ["#AF7AC5", "#fa9725"]   # Cluster 4
+        }
+
+        legend_entries = []
+        js_add_routes = "\n\n// === Drone Route Overlays (Hybrid GA + Tabu, Melawi) ===\n"
+
+        # === 4️⃣ Loop per cluster dan drone ===
+        for cid, routes in all_routes.items():
+            palette = cluster_color_palettes.get(cid, ["#555555", "#AAAAAA"])
+            for d_idx, route in enumerate(routes):
+                if len(route) <= 1:
+                    continue
+
+                latlons = []
+                for loc in route:
+                    if loc < len(self.road_points):  # depot
+                        lat, lon = self.road_points[loc]
+                    else:
+                        lat, lon = self.coordinates[loc - len(self.road_points)]
+                    latlons.append([lat, lon])
+
+                color = palette[d_idx % len(palette)]
+
+                js_add_routes += f"""
+    var droneRoute_{cid}_{d_idx} = L.polyline({latlons}, {{
+        color: '{color}',
+        weight: 3,
+        opacity: 0.9,
+        dashArray: '10, 10'
+    }}).addTo({map_var});
+    droneRoute_{cid}_{d_idx}.bindTooltip("Cluster {cid+1} - Drone {d_idx+1}");
+    """
+                legend_entries.append((f"Cluster {cid+1} - Drone {d_idx+1}", color))
+
+        js_add_routes += "\n// === End of Drone Routes ===\n"
+
+        # === 5️⃣ Tambahkan legenda ===
+        legend_html = '''
+        <div style="
+            position: fixed; bottom: 30px; left: 20px; width: 270px;
+            background-color: white; border:2px solid grey; z-index:9999;
+            font-size:13px; padding: 10px; line-height: 1.4;">
+            <b>Legenda Rute Drone ✈️ (Melawi Hybrid GA + Tabu)</b><br>
+            <hr style="margin:4px 0;">
+        '''
+        for label, color in legend_entries:
+            legend_html += f'<div><span style="background-color:{color};width:18px;height:10px;display:inline-block;margin-right:6px;"></span>{label}</div>'
+        legend_html += "<hr style='margin:6px 0;'>Garis putus-putus: Jalur Udara</div>"
+
+        js_add_routes += f"""
+    var legend = L.control({{position: 'bottomleft'}});
+    legend.onAdd = function (map) {{
+        var div = L.DomUtil.create('div', 'info legend');
+        div.innerHTML = `{legend_html}`;
+        return div;
+    }};
+    legend.addTo({map_var});
+    """
+
+        # === 6️⃣ Sisipkan JS ke HTML terakhir ===
+        script_tag = soup.find_all("script")[-1]
+        script_content = script_tag.string or ""
+        script_tag.string = script_content + js_add_routes
+
+        # === 7️⃣ Simpan hasil baru ===
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(str(soup))
+
+        print(f"✅ Rute drone (Hybrid GA + Tabu, Melawi) berhasil ditambahkan ke peta: {output_path}")
