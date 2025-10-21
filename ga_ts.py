@@ -411,7 +411,7 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
     penalty_factor = 100
 
     def __init__(self, csv_file=None, road_points=None, n_drones=None,
-                 tabu_on_children=True, tabu_tenure=15, tabu_budget=50):
+                tabu_on_children=True, tabu_tenure=15, tabu_budget=50):
         self.df = pd.read_csv(csv_file)
         self.coordinates = list(zip(self.df['Latitude'], self.df['Longitude']))
         self.clusters = self.df['Cluster'].tolist()
@@ -519,7 +519,6 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
         for _ in range(max_iter):
             n = len(current)
             neighbors = []
-            # 🔹 Evaluasi sebagian tetangga saja
             for _ in range(min(30, (n*(n-1))//2)):
                 i, j = random.sample(range(1, n-1), 2)
                 new = current[:]
@@ -544,7 +543,6 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
             else:
                 no_improve += 1
 
-            # 🔹 Restart jika stagnan
             if no_improve > 15:
                 random.shuffle(current[1:-1])
                 no_improve = 0
@@ -574,7 +572,6 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
 
         for _ in range(generations):
             new_population = []
-            # 🏆 Elitism — simpan solusi terbaik
             elite = min(population, key=lambda r: self._fitness([start_point] + r + [start_point]))
 
             for _ in range(population_size):
@@ -583,14 +580,12 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
                 child = self._order_crossover(p1, p2)
                 child = self._mutate(child, mutation_rate)
 
-                # ⚡ Jalankan Tabu hanya pada 20% anak terbaik
                 if self.tabu_on_children and random.random() < 0.2:
                     improved = self._tabu_search([start_point] + child + [start_point])
                     child = improved[1:-1]
 
                 new_population.append(child)
 
-            # Masukkan individu elit agar tidak hilang
             new_population[0] = elite
             population = new_population
 
@@ -607,15 +602,15 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
                 groups = self._split_hotspots_for_cluster(cid, n_drones)
                 for g in groups:
                     route = self.solve_tsp_hybrid(cid, hotspot_indices=g,
-                                                  population_size=population_size,
-                                                  generations=generations,
-                                                  mutation_rate=mutation_rate)
+                                                population_size=population_size,
+                                                generations=generations,
+                                                mutation_rate=mutation_rate)
                     cluster_routes.append(route)
             else:
                 route = self.solve_tsp_hybrid(cid,
-                                              population_size=population_size,
-                                              generations=generations,
-                                              mutation_rate=mutation_rate)
+                                            population_size=population_size,
+                                            generations=generations,
+                                            mutation_rate=mutation_rate)
                 cluster_routes = [route]
             all_routes[cid] = cluster_routes
         return all_routes
@@ -653,9 +648,9 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
                 print(f"  Drone {d_idx+1} Route: {route}")
                 print(f"    Total distance: {total_distance:.2f} km | Time: {flight_time_min:.2f} min {valid}")
 
-    def visualize_cluster_routes(self, all_routes,
-                             base_map_path="forest_fire_clusters_map.html",
-                             output_path="forest_fire_clusters_with_drone_routes.html"):
+    def visualize_cluster_routes_maps(self, all_routes,
+                            base_map_path="new_forest_fire_clusters_map.html",
+                            output_path="forest_fire_clusters_with_drone_routes.html"):
 
         # === 1️⃣ Baca peta dasar ===
         with open(base_map_path, "r", encoding="utf-8") as f:
@@ -673,9 +668,9 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
 
         # === 3️⃣ Warna kombinasi kustom per cluster ===
         cluster_color_palettes = {
-            0: ["#432323", "#D7A86E"],  # merah tua & hijau tua
-            1: ["#59AC77", "#6F00FF"],  # hijau muda & ungu terang
-            2: ["#F25912", "#5C3E94"],  # oranye & ungu tua
+            0: ["#FAB12F", "#DD0303"],
+            1: ["#3A6F43", "#FDAAAA"],
+            2: ["#3338A0", "#C59560"]
         }
 
         legend_entries = []
@@ -723,7 +718,18 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
             <hr style="margin:4px 0;">
         '''
         for label, color in legend_entries:
-            legend_html += f'<div><span style="background-color:{color};width:18px;height:10px;display:inline-block;margin-right:6px;"></span>{label}</div>'
+            legend_html += f'''
+        <div style="display:flex;align-items:center;margin-bottom:4px;">
+            <span style="
+                width:26px;
+                height:0;
+                border-top:2px dashed {color};
+                display:inline-block;
+                margin-right:8px;">
+            </span>
+            {label}
+        </div>
+        '''
         legend_html += "<hr style='margin:6px 0;'>Garis putus-putus: Jalur Udara</div>"
 
         js_add_routes += f"""
@@ -747,6 +753,87 @@ class ClusterBasedDroneRoutingHybridTabuOptimized:
 
         print(f"✅ Drone routes (warna kustom + legenda) berhasil ditambahkan ke peta: {output_path}")
         display_html(output_path)
+    
+    def visualize_cluster_routes(self, all_routes):
+        import matplotlib.pyplot as plt
+        from matplotlib.lines import Line2D  # untuk custom legend
+
+        plt.figure(figsize=(14, 10))
+
+        # 🎨 Palet warna kontras per cluster (4 cluster)
+        cluster_color_palettes = {
+            0: ["#FAB12F", "#DD0303"],   # Cluster 1: kuning & merah
+            1: ["#3A6F43", "#FDAAAA"],   # Cluster 2: hijau tua & pink muda
+            2: ["#3338A0", "#C59560"],   # Cluster 3: biru tua & coklat muda
+            3: ["#990099", "#009999"]    # Cluster 4: ungu tua & toska
+        }
+
+        legend_handles = []
+
+        # 🏠 Depot
+        for i, (lat, lon) in enumerate(self.road_points):
+            plt.scatter(lon, lat, c='black', s=200, marker='s', zorder=5)
+            plt.text(lon, lat, f'R{i}', ha='center', va='center',
+                    color='white', fontweight='bold')
+
+        # 🔥 Hotspots
+        for i, (lat, lon) in enumerate(self.coordinates):
+            cid = self.clusters[i]
+            base_color = cluster_color_palettes.get(cid, ['gray'])[0]
+            plt.scatter(lon, lat, c=base_color, s=100, alpha=0.7, zorder=4)
+            plt.text(lon, lat, f'H{i}', ha='center', va='center', fontsize=8)
+
+        # 🚁 Routes per cluster dan per drone
+        for cid, routes in all_routes.items():
+            palette = cluster_color_palettes.get(cid, ['gray', 'lightgray'])
+            for d_idx, route in enumerate(routes):
+                if len(route) <= 1:
+                    continue
+
+                color = palette[d_idx % len(palette)]
+                lats, lons = [], []
+                for loc in route:
+                    if loc < len(self.road_points):  # depot
+                        lat, lon = self.road_points[loc]
+                    else:  # hotspot
+                        lat, lon = self.coordinates[loc - len(self.road_points)]
+                    lats.append(lat)
+                    lons.append(lon)
+
+                line_label = f'Cluster {cid} Drone {d_idx+1}'
+                plt.plot(
+                    lons, lats, 'o-', color=color,
+                    linestyle='--', linewidth=2, markersize=6,
+                    label=line_label
+                )
+
+                # ✅ Legend pakai default dashed seperti plot di atas
+                legend_handles.append(Line2D(
+                    [0], [0],
+                    color=color,
+                    linestyle='--',
+                    linewidth=2,
+                    label=line_label
+                ))
+
+        # 🧾 Legend (pakai default dashed, rapi seperti contohmu)
+        plt.legend(
+            handles=legend_handles,
+            title="Legenda Drone Routes",
+            loc='lower left',
+            bbox_to_anchor=(0.01, 0.01),
+            frameon=True,
+            fontsize=10,
+            title_fontsize=11,
+            ncol=1
+        )
+
+        plt.title("Drone Routes (Hybrid GA + Tabu Search)", fontsize=15, fontweight='bold')
+        plt.xlabel("Longitude", fontsize=12)
+        plt.ylabel("Latitude", fontsize=12)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
 
 class ClusterBasedDroneRoutingHybridTabuMelawi:
     drone_speed = 30
@@ -991,41 +1078,93 @@ class ClusterBasedDroneRoutingHybridTabuMelawi:
                 print(f"  Drone {d_idx+1} Route: {route}")
                 print(f"    Total distance: {total_distance:.2f} km | Time: {flight_time_min:.2f} min {valid}")
     
-    # def visualize_cluster_routes(self, all_routes):
-    #     plt.figure(figsize=(14, 10))
-    #     colors = ['red','blue','green','orange','purple','brown','pink','gray']
+    def visualize_cluster_routes(self, all_routes):
+        import matplotlib.pyplot as plt
+        from matplotlib.lines import Line2D  # untuk custom legend
 
-    #     for i, (lat, lon) in enumerate(self.road_points):
-    #         plt.scatter(lon, lat, c='black', s=200, marker='s', zorder=5)
-    #         plt.text(lon, lat, f'R{i+1}', ha='center', va='center', fontweight='bold', fontsize=12, color='white')
+        plt.figure(figsize=(14, 10))
 
-    #     for i, (lat, lon) in enumerate(self.coordinates):
-    #         cid = self.clusters[i]
-    #         plt.scatter(lon, lat, c=colors[cid % len(colors)], s=80, alpha=0.7, zorder=4)
+        # 🎨 Palet warna kontras per cluster (4 cluster)
+        cluster_color_palettes = {
+            0: ["#FAB12F", "#DD0303"],
+            1: ["#3A6F43", "#FDAAAA"],
+            2: ["#3338A0", "#C59560"],
+            3: ["#990099", "#009999"]
+        }
 
-    #     for cid, routes in all_routes.items():
-    #         for d_idx, route in enumerate(routes):
-    #             if len(route) <= 1:
-    #                 continue
-    #             lats, lons = [], []
-    #             for loc in route:
-    #                 if loc < len(self.road_points):
-    #                     lat, lon = self.road_points[loc]
-    #                 else:
-    #                     lat, lon = self.coordinates[loc - len(self.road_points)]
-    #                 lats.append(lat)
-    #                 lons.append(lon)
-    #             plt.plot(lons, lats, 'o-', color=colors[cid % len(colors)],
-    #                     label=f'Cluster {cid+1} Drone {d_idx+1}', linewidth=2, markersize=6)
+        legend_handles = []
 
-    #     plt.title('Hybrid GA + Tabu Search (Melawi)', fontsize=14)
-    #     plt.xlabel('Longitude')
-    #     plt.ylabel('Latitude')
-    #     plt.legend()
-    #     plt.grid(True, alpha=0.3)
-    #     plt.tight_layout()
-    #     plt.show()
-    def visualize_cluster_routes(self, all_routes, base_map_path="forest_fire_clusters_map_melawi.html", output_path="forest_fire_clusters_with_ga_tabu_routes_melawi.html"):
+        # 🏠 Depot
+        for i, (lat, lon) in enumerate(self.road_points):
+            plt.scatter(lon, lat, c='black', s=200, marker='s', zorder=5)
+            plt.text(lon, lat, f'R{i}', ha='center', va='center',
+                    color='white', fontweight='bold')
+
+        # 🔥 Hotspots
+        for i, (lat, lon) in enumerate(self.coordinates):
+            cid = self.clusters[i]
+            base_color = cluster_color_palettes.get(cid, ['gray'])[0]
+            plt.scatter(lon, lat, c=base_color, s=100, alpha=0.7, zorder=4)
+            plt.text(lon, lat, f'H{i}', ha='center', va='center', fontsize=8)
+
+        # 🚁 Routes per cluster dan drone
+        for cid, routes in all_routes.items():
+            palette = cluster_color_palettes.get(cid, ['gray', 'lightgray'])
+            for d_idx, route in enumerate(routes):  # ✅ hanya route, tidak hotspot_indices
+                if len(route) <= 1:
+                    continue
+
+                color = palette[d_idx % len(palette)]
+                lats, lons = [], []
+
+                for loc in route:
+                    if loc < len(self.road_points):  # depot
+                        lat, lon = self.road_points[loc]
+                    else:  # hotspot
+                        lat, lon = self.coordinates[loc - len(self.road_points)]
+                    lats.append(lat)
+                    lons.append(lon)
+
+                # 🟢 Garis rute (dashed natural)
+                line_label = f'Cluster {cid} Drone {d_idx+1}'
+                plt.plot(
+                    lons, lats, 'o-', color=color,
+                    linestyle='--', linewidth=2, markersize=6,
+                    label=line_label
+                )
+
+                # 🔹 Legend handle natural dashed
+                legend_handles.append(Line2D(
+                    [0], [0],
+                    color=color,
+                    linestyle='--',
+                    linewidth=2,
+                    label=line_label
+                ))
+
+        # 🧾 Legend (rapi, natural dashed)
+        plt.legend(
+            handles=legend_handles,
+            title="Legenda Drone Routes",
+            loc='lower left',
+            bbox_to_anchor=(0.01, 0.01),
+            frameon=True,
+            framealpha=0.9,
+            fontsize=10,
+            title_fontsize=11,
+            ncol=1
+        )
+
+        plt.title("Drone Routes (Hybrid GA + Tabu Search, Melawi)", fontsize=15, fontweight='bold')
+        plt.xlabel("Longitude", fontsize=12)
+        plt.ylabel("Latitude", fontsize=12)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+
+
+    def visualize_cluster_routes_maps(self, all_routes, base_map_path="forest_fire_clusters_map_melawi.html", output_path="forest_fire_clusters_with_ga_tabu_routes_melawi.html"):
         from bs4 import BeautifulSoup
         import re
 
@@ -1049,10 +1188,10 @@ class ClusterBasedDroneRoutingHybridTabuMelawi:
 
         # === 3️⃣ Warna kustom per cluster (Melawi: 4 cluster) ===
         cluster_color_palettes = {
-            0: ["#A93226", "#E74C3C"],  # Cluster 1
-            1: ["#1E8449", "#52BE80"],  # Cluster 2
-            2: ["#2471A3", "#85C1E9"],  # Cluster 3
-            3: ["#AF7AC5", "#fa9725"]   # Cluster 4
+            0: ["#FAB12F", "#DD0303"],
+            1: ["#3A6F43", "#FDAAAA"],
+            2: ["#3338A0", "#C59560"],
+            3: ["#990099", "#009999"],
         }
 
         legend_entries = []
@@ -1098,7 +1237,18 @@ class ClusterBasedDroneRoutingHybridTabuMelawi:
             <hr style="margin:4px 0;">
         '''
         for label, color in legend_entries:
-            legend_html += f'<div><span style="background-color:{color};width:18px;height:10px;display:inline-block;margin-right:6px;"></span>{label}</div>'
+            legend_html += f'''
+        <div style="display:flex;align-items:center;margin-bottom:4px;">
+            <span style="
+                width:26px;
+                height:0;
+                border-top:2px dashed {color};
+                display:inline-block;
+                margin-right:8px;">
+            </span>
+            {label}
+        </div>
+        '''
         legend_html += "<hr style='margin:6px 0;'>Garis putus-putus: Jalur Udara</div>"
 
         js_add_routes += f"""
