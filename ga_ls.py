@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 import random
+from bs4 import BeautifulSoup
+import re
+from matplotlib.lines import Line2D
 
 class ClusterBasedDroneRouting_Hybrid:
     def __init__(self, csv_file=None, road_points=None, n_drones=None):
@@ -153,85 +156,179 @@ class ClusterBasedDroneRouting_Hybrid:
             route[i], route[j] = route[j], route[i]
         return route
     
-    # HYBRID GA + Local Search
+    # HYBRID GA + Local Search (LS Sembari GA)
+    # def solve_tsp_hybrid(self, cluster_id, hotspot_indices=None, 
+    #                     population_size=80, generations=150, mutation_rate=0.2,
+    #                     local_search_freq=10, local_search_intensity=20):
+    #     """
+    #     Improved Hybrid Genetic Algorithm + Local Search (Adaptive Memetic)
+    #     - LS applied less frequently and more adaptively (stronger later)
+    #     - Mutation rate increased for diversity
+    #     - LS intensity grows gradually with generation count
+    #     """
+    #     # Setup hotspots to visit
+    #     if hotspot_indices is None:
+    #         cluster_hotspots = [i + len(self.road_points) for i, c in enumerate(self.clusters) if c == cluster_id]
+    #     else:
+    #         cluster_hotspots = [i + len(self.road_points) for i in hotspot_indices]
+
+    #     if not cluster_hotspots:
+    #         return []
+    #     if len(cluster_hotspots) == 1:
+    #         return [cluster_id] + cluster_hotspots + [cluster_id]
+
+    #     start_point = cluster_id
+
+    #     # Initialize population
+    #     def _greedy_route(nodes):
+    #         if len(nodes) <= 1:
+    #             return nodes[:]
+    #         route = [nodes[0]]
+    #         unvisited = set(nodes[1:])
+    #         while unvisited:
+    #             last = route[-1]
+    #             next_node = min(unvisited, key=lambda x: self.dist_matrix[last][x])
+    #             route.append(next_node)
+    #             unvisited.remove(next_node)
+    #         return route
+
+    #     # Initialize population
+    #     population = []
+    #     for _ in range(population_size):
+    #         if random.random() < 0.2:  # 20% greedy, 80% random
+    #             population.append(_greedy_route(cluster_hotspots))
+    #         else:
+    #             population.append(random.sample(cluster_hotspots, len(cluster_hotspots)))
+
+    #     best_route_so_far = None
+    #     best_dist = float('inf')
+
+    #     # HYBRID EVOLUTION LOOP
+    #     for gen in range(generations):
+    #         # === 1. Genetic Algorithm evolution ===
+    #         new_population = []
+    #         for _ in range(population_size):
+    #             parent1 = self._tournament_selection(population)
+    #             parent2 = self._tournament_selection(population)
+    #             child = self._order_crossover(parent1, parent2)
+    #             child = self._mutate(child, mutation_rate)
+    #             new_population.append(child)
+    #         population = new_population
+
+    #         # === 2. Adaptive Local Search (Memetic Component) ===
+    #         # Apply LS only after 40% of generations have passed
+    #         if gen > generations * 0.4 and (gen + 1) % local_search_freq == 0:
+    #             # Sort population by fitness
+    #             population.sort(key=lambda r: self._route_distance_segment(r))
+
+    #             # Apply LS to small subset of top 10%
+    #             elite_count = max(1, population_size // 10)
+
+    #             # LS intensity grows with generation progress
+    #             adaptive_intensity = int(local_search_intensity * (gen / generations) + 5)
+
+    #             for i in random.sample(range(elite_count), k=min(3, elite_count)):
+    #                 population[i] = self._local_search_2opt(
+    #                     population[i], 
+    #                     max_iter=adaptive_intensity
+    #                 )
+
+    #         # Track best route so far
+    #         population.sort(key=lambda r: self._route_distance_segment(r))
+    #         current_best = population[0]
+    #         current_dist = self._route_distance([start_point] + current_best + [start_point])
+    #         if current_dist < best_dist:
+    #             best_dist = current_dist
+    #             best_route_so_far = current_best[:]
+
+    #     # === 3. Final Intensive Local Search ===
+    #     best_route_final = self._local_search_2opt(
+    #         best_route_so_far, 
+    #         max_iter=local_search_intensity * 3
+    #     )
+
+    #     final_route = [start_point] + best_route_final + [start_point]
+    #     final_distance = self._route_distance(final_route)
+
+    #     return final_route
+    
+    #LS Setelah GA
     def solve_tsp_hybrid(self, cluster_id, hotspot_indices=None, 
                         population_size=50, generations=200, mutation_rate=0.1,
-                        local_search_freq=10, local_search_intensity=50):
+                        local_search_freq=None,
+                        local_search_intensity=100):
         """
-        Hybrid Genetic Algorithm + Local Search for TSP
-        Strategy:
-        1. GA explores the solution space globally
-        2. Every 'local_search_freq' generations, apply 2-opt to best individuals
-        3. Final solution gets intensive 2-opt refinement
-        Parameters:
-        - cluster_id: Starting point cluster ID
-        - hotspot_indices: Subset of hotspots to visit (or None for all)
-        - population_size: Number of individuals in GA population
-        - generations: Number of GA generations
-        - mutation_rate: Probability of mutation
-        - local_search_freq: Apply LS every N generations (memetic approach)
-        - local_search_intensity: Max iterations for 2-opt refinement
+        HYBRID: Pure GA + Final 2-opt (Post-Optimization)
+        - No LS during evolution → preserves GA diversity
+        - LS applied ONCE at the end to best GA solution
+        - Includes elitism and greedy initialization
         """
-        # Setup hotspots to visit
         if hotspot_indices is None:
             cluster_hotspots = [i + len(self.road_points) for i, c in enumerate(self.clusters) if c == cluster_id]
         else:
             cluster_hotspots = [i + len(self.road_points) for i in hotspot_indices]
-        
-        # Handle trivial cases
+
         if not cluster_hotspots:
             return []
         if len(cluster_hotspots) == 1:
             return [cluster_id] + cluster_hotspots + [cluster_id]
-        
+
         start_point = cluster_id
-        
-        # Initialize population with random permutations
-        population = [random.sample(cluster_hotspots, len(cluster_hotspots)) 
-                     for _ in range(population_size)]
-                
-        # HYBRID EVOLUTION LOOP
+
+        # === Greedy + Random Initialization ===
+        def _greedy_route(nodes):
+            if len(nodes) <= 1:
+                return nodes[:]
+            route = [nodes[0]]
+            unvisited = set(nodes[1:])
+            while unvisited:
+                last = route[-1]
+                next_node = min(unvisited, key=lambda x: self.dist_matrix[last][x])
+                route.append(next_node)
+                unvisited.remove(next_node)
+            return route
+
+        population = []
+        for _ in range(population_size):
+            if random.random() < 0.3:  # 30% greedy
+                population.append(_greedy_route(cluster_hotspots))
+            else:
+                population.append(random.sample(cluster_hotspots, len(cluster_hotspots)))
+
+        best_ever = min(population, key=lambda r: self._route_distance_segment(r))
+        best_ever_dist = self._route_distance_segment(best_ever)
+
+        # === PURE GA LOOP (NO LS DURING EVOLUTION) ===
         for gen in range(generations):
-            # Standard GA operations
-            new_population = []
-            for _ in range(population_size):
+            # Elitism: keep best from previous gen
+            elite = best_ever[:]
+
+            # Create new population
+            new_population = [elite]  # keep elite
+            while len(new_population) < population_size:
                 parent1 = self._tournament_selection(population)
                 parent2 = self._tournament_selection(population)
                 child = self._order_crossover(parent1, parent2)
                 child = self._mutate(child, mutation_rate)
                 new_population.append(child)
-            
+
             population = new_population
-            
-            # MEMETIC COMPONENT: Periodic local search on elite individuals
-            if (gen + 1) % local_search_freq == 0:
-                # Sort population by fitness
-                population.sort(key=lambda r: self._route_distance_segment(r))
-                
-                # Apply 2-opt to top 20% of population
-                elite_count = max(1, population_size // 5)
-                for i in range(elite_count):
-                    population[i] = self._local_search_2opt(
-                        population[i], 
-                        max_iter=local_search_intensity
-                    )
-                
-                # Get best distance for monitoring
-                best_route_so_far = population[0]
-                best_dist = self._route_distance([start_point] + best_route_so_far + [start_point])
-        
-        # FINAL INTENSIVE LOCAL SEARCH
-        population.sort(key=lambda r: self._route_distance_segment(r))
-        best_route = self._local_search_2opt(
-            population[0], 
-            max_iter=local_search_intensity * 3  # 3x more intensive
+
+            # Update best_ever
+            current_best = min(population, key=lambda r: self._route_distance_segment(r))
+            current_dist = self._route_distance_segment(current_best)
+            if current_dist < best_ever_dist:
+                best_ever = current_best[:]
+                best_ever_dist = current_dist
+
+        # === FINAL LOCAL SEARCH (ONLY ONCE!) ===
+        best_route_refined = self._local_search_2opt(
+            best_ever,
+            max_iter=local_search_intensity
         )
-        
-        final_route = [start_point] + best_route + [start_point]
-        final_distance = self._route_distance(final_route)
-        
-        return final_route
-    
+
+        return [start_point] + best_route_refined + [start_point]
+
     # Optimization Wrapper
     def optimize_all_clusters(self, population_size=50, generations=200, 
                              mutation_rate=0.1, local_search_freq=10, 
@@ -282,26 +379,37 @@ class ClusterBasedDroneRouting_Hybrid:
     # Visualization & Output
     def visualize_cluster_routes(self, all_routes):
         plt.figure(figsize=(14, 10))
-        colors = ['red','blue','green','orange','purple','brown','pink','gray']
-        
-        # Road points
+
+        # Define color mapping (cluster → drone → color)
+        color_map = {
+            0: {0: "#FAB12F", 1: "#DD0303"},  # Cluster 1
+            1: {0: "#3A6F43", 1: "#FDAAAA"},  # Cluster 2
+            2: {0: "#3338A0", 1: "#C59560"},  # Cluster 3
+            3: {0: "#990099", 1: "#009999"},  # Cluster 4
+        }
+
+        # --- Road points ---
         for i, (lat, lon) in enumerate(self.road_points):
             plt.scatter(lon, lat, c='black', s=200, marker='s', zorder=5)
-            plt.text(lon, lat, f'R{i}', ha='center', va='center', 
-                    fontweight='bold', fontsize=12, color='white')
-        
-        # Hotspots
+            plt.text(lon, lat, f'R{i}', ha='center', va='center', fontweight='bold', fontsize=12, color='white')
+
+        # --- Hotspots ---
         for i, (lat, lon) in enumerate(self.coordinates):
             cid = self.clusters[i]
-            plt.scatter(lon, lat, c=colors[cid % len(colors)], s=100, alpha=0.7, zorder=4)
-            plt.text(lon, lat, f'H{i}', ha='center', va='center', 
-                    fontsize=8, fontweight='bold')
-        
-        # Routes
+            plt.scatter(lon, lat, c='gray', s=80, alpha=0.6, zorder=4)
+            plt.text(lon, lat, f'H{i}', ha='center', va='center', fontsize=8, fontweight='bold')
+
+        # --- Routes ---
         for cid, routes in all_routes.items():
-            for d_idx, route in enumerate(routes):
-                if len(route) <= 1: 
+            for d_idx, route_info in enumerate(routes):
+                if isinstance(route_info, tuple):
+                    route, _ = route_info
+                else:
+                    route = route_info
+
+                if len(route) <= 1:
                     continue
+
                 lats, lons = [], []
                 for loc in route:
                     if loc < len(self.road_points):
@@ -310,10 +418,19 @@ class ClusterBasedDroneRouting_Hybrid:
                         lat, lon = self.coordinates[loc - len(self.road_points)]
                     lats.append(lat)
                     lons.append(lon)
-                plt.plot(lons, lats, 'o-', color=colors[cid % len(colors)],
-                        label=f'Cluster {cid} Drone {d_idx+1}', linewidth=2, markersize=6)
-        
-        plt.title('Drone Routes (Hybrid GA + Local Search)', fontsize=16, fontweight='bold')
+
+                color = color_map.get(cid, {}).get(d_idx, "black")
+
+                plt.plot(
+                    lons, lats, 'o-',
+                    color=color,
+                    linestyle='--',           # 🔹 Dashed line style
+                    linewidth=2.5,
+                    markersize=6,
+                    label=f'Cluster {cid+1} Drone {d_idx+1}'
+                )
+
+        plt.title('Drone Routes (Local Search 2-opt)')
         plt.xlabel('Longitude')
         plt.ylabel('Latitude')
         plt.legend()
@@ -333,7 +450,10 @@ class ClusterBasedDroneRouting_Hybrid:
             road_lat, road_lon = self.road_points[cid]
             print(f"  Start from road point: ({road_lat:.5f}, {road_lon:.5f})")
             
-            routes = all_routes[cid]
+            routes = all_routes.get(cid, [])
+            if not routes:
+                print(f"  ⚠️ No routes found for cluster {cid}. Skipping.")
+                continue
             for d_idx, route in enumerate(routes):
                 if len(route) <= 1:
                     print(f"  Drone {d_idx+1}: No hotspots assigned")
@@ -363,3 +483,299 @@ class ClusterBasedDroneRouting_Hybrid:
         
         print(f"TOTAL DISTANCE (ALL DRONES): {total_distance_all:.2f} km")
         print(f"TOTAL FLIGHT TIME (ALL DRONES): {total_time_all:.2f} minutes")
+
+  #Baru
+    def new_visualize_cluster_routes_ketapang(self, all_routes,
+                                    base_map_path="new_forest_fire_clusters_map_melawi.html",
+                                    output_path="new2_forest_fire_clusters_map_melawi.html"):
+
+        from bs4 import BeautifulSoup
+        import re
+
+        # === 1️⃣ Baca peta dasar ===
+        with open(base_map_path, "r", encoding="utf-8") as f:
+            html_data = f.read()
+
+        soup = BeautifulSoup(html_data, "html.parser")
+
+        # === 2️⃣ Deteksi variabel map Folium ===
+        map_var_match = re.search(r"var\s+(map_[a-z0-9]+)\s*=", html_data)
+        if not map_var_match:
+            print("❌ Tidak ditemukan variabel peta di file HTML.")
+            return
+        map_var = map_var_match.group(1)
+        print(f"✅ Variabel peta terdeteksi: {map_var}")
+
+        # === 3️⃣ Warna kombinasi kustom per cluster ===
+        cluster_color_palettes = {
+            0: ["#FAB12F", "#DD0303"],
+            1: ["#3A6F43", "#FDAAAA"],
+            2: ["#3338A0", "#C59560"],
+            3: ["#990099","#009999"]
+        }
+
+        legend_entries = []
+        js_add_routes = "\n\n// === Tambahan: Drone Route Overlays ===\n"
+
+        # === 4️⃣ Tambahkan PolyLine putus-putus per drone ===
+        for cid, routes in all_routes.items():
+            palette = cluster_color_palettes.get(cid, ["#555555", "#AAAAAA"])
+            for d_idx, route in enumerate(routes):
+                if len(route) <= 1:
+                    continue
+
+                latlons = []
+                for loc in route:
+                    if loc < len(self.road_points):
+                        lat, lon = self.road_points[loc]
+                    else:
+                        lat, lon = self.coordinates[loc - len(self.road_points)]
+                    latlons.append([lat, lon])
+
+                color = palette[d_idx % len(palette)]
+
+                js_add_routes += f"""
+    var droneRoute_{cid}_{d_idx} = L.polyline({latlons}, {{
+        color: '{color}',
+        weight: 3,
+        opacity: 0.9,
+        dashArray: '10, 10'
+    }}).addTo({map_var});
+    droneRoute_{cid}_{d_idx}.bindTooltip("Cluster {cid} - Drone {d_idx+1}");
+    """
+                legend_entries.append((f"Cluster {cid} - Drone {d_idx+1}", color))
+
+        js_add_routes += "\n// === End of Drone Routes ===\n"
+
+        # === 5️⃣ Buat HTML legenda ===
+        legend_html = '''
+        <div style="
+            position: fixed; bottom: 30px; left: 20px; width: 270px;
+            background-color: white; border:2px solid grey; z-index:9999;
+            font-size:13px; padding: 10px; line-height: 1.4;">
+            <b>Legenda Rute Drone ✈️</b><br>
+            <hr style="margin:4px 0;">
+        '''
+        for label, color in legend_entries:
+            legend_html += f'''
+        <div style="display:flex;align-items:center;margin-bottom:4px;">
+            <span style="
+                width:26px;
+                height:0;
+                border-top:2px dashed {color};
+                display:inline-block;
+                margin-right:8px;">
+            </span>
+            {label}
+        </div>
+        '''
+        legend_html += "<hr style='margin:6px 0;'>Garis putus-putus: Jalur Udara</div>"
+
+        # === 6️⃣ Sisipkan JS legenda (pakai backtick untuk HTML multiline) ===
+        js_add_routes += f"""
+    var legend = L.control({{position: 'bottomleft'}});
+    legend.onAdd = function (map) {{
+        var div = L.DomUtil.create('div', 'info legend');
+        div.innerHTML = `{legend_html}`;
+        return div;
+    }};
+    legend.addTo({map_var});
+    """
+
+        # === 7️⃣ Sisipkan JS ke HTML terakhir ===
+        script_tag = soup.find_all("script")[-1]
+        script_content = script_tag.string or ""
+        script_tag.string = script_content + js_add_routes
+
+        # === 8️⃣ Simpan hasil ===
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(str(soup))
+
+        print(f"✅ Drone routes (warna kustom + legenda) berhasil ditambahkan ke peta: {output_path}")
+
+    def new_visualize_cluster_routes_melawai(self, all_routes,
+                                    base_map_path="new2_forest_fire_clusters_map_melawi.html",
+                                    output_path="new3_forest_fire_clusters_map_melawi.html"):
+
+        from bs4 import BeautifulSoup
+        import re
+
+        # === 1️⃣ Baca peta dasar ===
+        with open(base_map_path, "r", encoding="utf-8") as f:
+            html_data = f.read()
+
+        soup = BeautifulSoup(html_data, "html.parser")
+
+        # === 2️⃣ Deteksi variabel map Folium ===
+        map_var_match = re.search(r"var\s+(map_[a-z0-9]+)\s*=", html_data)
+        if not map_var_match:
+            print("❌ Tidak ditemukan variabel peta di file HTML.")
+            return
+        map_var = map_var_match.group(1)
+        print(f"✅ Variabel peta terdeteksi: {map_var}")
+
+        # === 3️⃣ Warna kombinasi kustom per cluster ===
+        cluster_color_palettes = {
+            0: ["#FAB12F", "#DD0303"],
+            1: ["#3A6F43", "#FDAAAA"],
+            2: ["#3338A0", "#C59560"],
+            3: ["#990099","#009999"]
+        }
+
+        legend_entries = []
+        js_add_routes = "\n\n// === Tambahan: Drone Route Overlays ===\n"
+
+        # === 4️⃣ Tambahkan PolyLine putus-putus per drone ===
+        for cid, routes in all_routes.items():
+            palette = cluster_color_palettes.get(cid, ["#555555", "#AAAAAA"])
+            for d_idx, route in enumerate(routes):
+                if len(route) <= 1:
+                    continue
+
+                latlons = []
+                for loc in route:
+                    if loc < len(self.road_points):
+                        lat, lon = self.road_points[loc]
+                    else:
+                        lat, lon = self.coordinates[loc - len(self.road_points)]
+                    latlons.append([lat, lon])
+
+                color = palette[d_idx % len(palette)]
+
+                js_add_routes += f"""
+    var droneRoute_{cid}_{d_idx} = L.polyline({latlons}, {{
+        color: '{color}',
+        weight: 3,
+        opacity: 0.9,
+        dashArray: '10, 10'
+    }}).addTo({map_var});
+    droneRoute_{cid}_{d_idx}.bindTooltip("Cluster {cid} - Drone {d_idx+1}");
+    """
+                legend_entries.append((f"Cluster {cid} - Drone {d_idx+1}", color))
+
+        js_add_routes += "\n// === End of Drone Routes ===\n"
+
+        # === 5️⃣ Buat HTML legenda ===
+        legend_html = '''
+        <div style="
+            position: fixed; bottom: 30px; left: 20px; width: 270px;
+            background-color: white; border:2px solid grey; z-index:9999;
+            font-size:13px; padding: 10px; line-height: 1.4;">
+            <b>Legenda Rute Drone ✈️</b><br>
+            <hr style="margin:4px 0;">
+        '''
+        for label, color in legend_entries:
+            legend_html += f'''
+        <div style="display:flex;align-items:center;margin-bottom:4px;">
+            <span style="
+                width:26px;
+                height:0;
+                border-top:2px dashed {color};
+                display:inline-block;
+                margin-right:8px;">
+            </span>
+            {label}
+        </div>
+        '''
+        legend_html += "<hr style='margin:6px 0;'>Garis putus-putus: Jalur Udara</div>"
+
+        # === 6️⃣ Sisipkan JS legenda (pakai backtick untuk HTML multiline) ===
+        js_add_routes += f"""
+    var legend = L.control({{position: 'bottomleft'}});
+    legend.onAdd = function (map) {{
+        var div = L.DomUtil.create('div', 'info legend');
+        div.innerHTML = `{legend_html}`;
+        return div;
+    }};
+    legend.addTo({map_var});
+    """
+
+        # === 7️⃣ Sisipkan JS ke HTML terakhir ===
+        script_tag = soup.find_all("script")[-1]
+        script_content = script_tag.string or ""
+        script_tag.string = script_content + js_add_routes
+
+        # === 8️⃣ Simpan hasil ===
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(str(soup))
+
+        print(f"✅ Drone routes (warna kustom + legenda) berhasil ditambahkan ke peta: {output_path}")
+
+    def new_visualize_cluster_routes(self, all_routes):
+        plt.figure(figsize=(14, 10))
+
+        # 🎨 Define color mapping (cluster → drone → color)
+        color_map = {
+            0: {0: "#FAB12F", 1: "#DD0303"},  # Cluster 1
+            1: {0: "#3A6F43", 1: "#FDAAAA"},  # Cluster 2
+            2: {0: "#3338A0", 1: "#C59560"},  # Cluster 3
+            3: {0: "#990099", 1: "#009999"},  # Cluster 4
+        }
+
+        legend_handles = []  # Custom legend container
+
+        # 🏠 Road points (depots)
+        for i, (lat, lon) in enumerate(self.road_points):
+            plt.scatter(lon, lat, c='black', s=200, marker='s', zorder=5)
+            plt.text(lon, lat, f'R{i}', ha='center', va='center',
+                    color='white', fontweight='bold')
+
+        # 🔥 Hotspots
+        for i, (lat, lon) in enumerate(self.coordinates):
+            cid = self.clusters[i]
+            plt.scatter(lon, lat, c='gray', s=80, alpha=0.6, zorder=4)
+            plt.text(lon, lat, f'H{i}', ha='center', va='center',
+                    fontsize=8, fontweight='bold')
+
+        # 🚁 Routes per cluster & drone
+        for cid, routes in all_routes.items():
+            for d_idx, route_info in enumerate(routes):
+                if isinstance(route_info, tuple):
+                    route, _ = route_info
+                else:
+                    route = route_info
+
+                if len(route) <= 1:
+                    continue
+
+                lats, lons = [], []
+                for loc in route:
+                    if loc < len(self.road_points):
+                        lat, lon = self.road_points[loc]
+                    else:
+                        lat, lon = self.coordinates[loc - len(self.road_points)]
+                    lats.append(lat)
+                    lons.append(lon)
+
+                color = color_map.get(cid, {}).get(d_idx, "black")
+                label = f'Cluster {cid+1} Drone {d_idx+1}'
+
+                plt.plot(
+                    lons, lats, 'o-',
+                    color=color,
+                    linestyle='--',
+                    linewidth=2.5,
+                    markersize=6,
+                    label=label
+                )
+
+                # Add legend handle manually for better formatting
+                legend_handles.append(Line2D(
+                    [0], [0],
+                    color=color,
+                    linestyle='--',
+                    linewidth=2.5,
+                    label=label
+                ))
+
+        # 🧾 Custom Legend
+        plt.legend(handles=legend_handles, title="Legenda Drone Routes",
+                title_fontsize=11, fontsize=9, loc='best')
+
+        # 📊 Labels & Styling
+        plt.title('Drone Routes (Local Search 2-opt)', fontsize=14, fontweight='bold')
+        plt.xlabel('Longitude')
+        plt.ylabel('Latitude')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()

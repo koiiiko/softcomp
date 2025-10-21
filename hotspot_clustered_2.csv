@@ -1,0 +1,78 @@
+Provinsi,Kab Kota,Kecamatan,Desa,Tanggal,Waktu,Satelit,Confidence,Latitude,Longitude,Cluster
+Kalimantan Barat,MELAWI,Belimbing,Tekaban,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.41351,111.60397,2
+Kalimantan Barat,MELAWI,Belimbing,Tekaban,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.40953,111.61059,2
+Kalimantan Barat,MELAWI,Belimbing Hulu,Nanga Tikan,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.45546,111.57509,2
+Kalimantan Barat,MELAWI,Belimbing Hulu,Nanga Tikan,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.41666,111.58301,2
+Kalimantan Barat,MELAWI,Belimbing Hulu,Nanga Tikan,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.41257,111.58916,2
+Kalimantan Barat,MELAWI,Ella Hilir,Kahiya,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.61044,111.95261,3
+Kalimantan Barat,MELAWI,Ella Hilir,Nyanggau,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.51758,112.1405,0
+Kalimantan Barat,MELAWI,Menukung,Batas Nangka,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.33793,112.29549,0
+Kalimantan Barat,MELAWI,Menukung,Nanga Melona Satu,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.37988,112.35873,0
+Kalimantan Barat,MELAWI,Menukung,Sampak,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.50408,112.23573,0
+Kalimantan Barat,MELAWI,Menukung,Sampak,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.50338,112.22876,0
+Kalimantan Barat,MELAWI,Menukung,Sungai Sampuk,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.36309,112.29893,0
+Kalimantan Barat,MELAWI,Pinoh Selatan,Nanga Pintas,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.58228,111.79121,3
+Kalimantan Barat,MELAWI,Pinoh Selatan,Nyanggai,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.57914,111.81206,3
+Kalimantan Barat,MELAWI,Pinoh Selatan,Nyanggai,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.57653,111.81879,3
+Kalimantan Barat,MELAWI,Pinoh Utara,Tengkajau,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.22109,111.74229,2
+Kalimantan Barat,MELAWI,Pinoh Utara,Tengkajau,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.21054,111.73374,2
+Kalimantan Barat,MELAWI,Sayan,Karangan Purun,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.65351,111.66005,1
+Kalimantan Barat,MELAWI,Sayan,Nanga Sayan,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.66687,111.66169,1
+Kalimantan Barat,MELAWI,Tanah Pinoh,Bina Karya,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.80857,111.59759,1
+Kalimantan Barat,MELAWI,Tanah Pinoh,Bina Karya,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.80706,111.58231,1
+Kalimantan Barat,MELAWI,Tanah Pinoh,Pelita Kenaya,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.81188,111.57578,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Laja,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.6993,111.4431,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Laja,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.69609,111.46478,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Lintah Taum,13/08/2024,13:22 WIB,NASA-MODIS,Medium,-0.64915,111.50264,1
+Kalimantan Barat,MELAWI,Ella Hilir,Kahiya,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.59421,111.96908,3
+Kalimantan Barat,MELAWI,Ella Hilir,Kahiya,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.59377,111.97195,3
+Kalimantan Barat,MELAWI,Ella Hilir,Kerangan Kora,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.68241,112.05838,3
+Kalimantan Barat,MELAWI,Ella Hilir,Kerangan Kora,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.63711,112.07314,3
+Kalimantan Barat,MELAWI,Ella Hilir,Nanga Kempangai,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.60202,112.09362,3
+Kalimantan Barat,MELAWI,Ella Hilir,Nanga Kempangai,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.6014,112.0976,3
+Kalimantan Barat,MELAWI,Ella Hilir,Nanga Nyuruh,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.53658,112.10039,3
+Kalimantan Barat,MELAWI,Ella Hilir,Penyuguk,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.68805,112.05679,3
+Kalimantan Barat,MELAWI,Ella Hilir,Penyuguk,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.68701,112.06358,3
+Kalimantan Barat,MELAWI,Menukung,Batu Onap,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.40712,112.35117,0
+Kalimantan Barat,MELAWI,Pinoh Selatan,Nyanggai,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.5708,111.81277,3
+Kalimantan Barat,MELAWI,Sayan,Bora,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.67036,111.75863,1
+Kalimantan Barat,MELAWI,Sayan,Bora,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.62477,111.76907,3
+Kalimantan Barat,MELAWI,Sayan,Karangan Purun,13/08/2024,12:21 WIB,NASA-NOAA20,Medium,-0.66237,111.63191,1
+Kalimantan Barat,MELAWI,Belimbing Hulu,Kayu Bunga,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.50533,111.57957,1
+Kalimantan Barat,MELAWI,Belimbing Hulu,Nanga Raya,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.59748,111.49278,1
+Kalimantan Barat,MELAWI,Belimbing Hulu,Nanga Raya,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.51256,111.49725,1
+Kalimantan Barat,MELAWI,Ella Hilir,Bemban Permai,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.58565,112.01117,3
+Kalimantan Barat,MELAWI,Ella Hilir,Bemban Permai,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.58512,112.01437,3
+Kalimantan Barat,MELAWI,Ella Hilir,Kahiya,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.59343,111.96332,3
+Kalimantan Barat,MELAWI,Ella Hilir,Kahiya,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.59255,111.96637,3
+Kalimantan Barat,MELAWI,Ella Hilir,Kerangan Kora,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.63527,112.07049,3
+Kalimantan Barat,MELAWI,Ella Hilir,Kerangan Kora,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.62379,112.06822,3
+Kalimantan Barat,MELAWI,Ella Hilir,Lengkong Nyadom,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.38019,112.03834,0
+Kalimantan Barat,MELAWI,Ella Hilir,Nanga Kempangai,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.59164,112.04866,3
+Kalimantan Barat,MELAWI,Ella Hilir,Nyanggau,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.51651,112.14944,0
+Kalimantan Barat,MELAWI,Menukung,Sampak,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.49674,112.23648,0
+Kalimantan Barat,MELAWI,Menukung,Sungai Sampuk,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.35058,112.33224,0
+Kalimantan Barat,MELAWI,Pinoh Selatan,Landau Garong,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.56278,111.93114,3
+Kalimantan Barat,MELAWI,Pinoh Utara,Merah Arai,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.27756,111.89579,2
+Kalimantan Barat,MELAWI,Pinoh Utara,Tengkajau,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.21269,111.74073,2
+Kalimantan Barat,MELAWI,Pinoh Utara,Tengkajau,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.20699,111.73987,2
+Kalimantan Barat,MELAWI,Sayan,Bora,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.63505,111.77854,3
+Kalimantan Barat,MELAWI,Sayan,Bora,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.63289,111.78098,3
+Kalimantan Barat,MELAWI,Sayan,Bora,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.62936,111.77778,3
+Kalimantan Barat,MELAWI,Sayan,Karangan Purun,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.65581,111.66961,1
+Kalimantan Barat,MELAWI,Sayan,Karangan Purun,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.65315,111.66647,1
+Kalimantan Barat,MELAWI,Sayan,Karangan Purun,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.65235,111.67139,1
+Kalimantan Barat,MELAWI,Sayan,Karangan Purun,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.65001,111.66984,1
+Kalimantan Barat,MELAWI,Sayan,Mekar Pelita,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.68385,111.72727,1
+Kalimantan Barat,MELAWI,Sayan,Nanga Pak,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.54442,111.66145,1
+Kalimantan Barat,MELAWI,Tanah Pinoh,Bina Jaya,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.79613,111.62212,1
+Kalimantan Barat,MELAWI,Tanah Pinoh,Bina Karya,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.77817,111.56543,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Laja,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.68685,111.45769,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Laja,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.68626,111.46133,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Laja,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.671,111.48528,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Laja,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.66681,111.48682,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Laja,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.63517,111.47066,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Lintah Taum,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.64613,111.5099,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Lintah Taum,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.64556,111.51357,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Lintah Taum,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.64054,111.50911,1
+Kalimantan Barat,MELAWI,Tanah Pinoh Barat,Lintah Taum,13/08/2024,13:37 WIB,NASA-SNPP,Medium,-0.61948,111.5341,1

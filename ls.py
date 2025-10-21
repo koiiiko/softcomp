@@ -5,6 +5,7 @@ from sklearn.cluster import KMeans
 import random
 from bs4 import BeautifulSoup
 import re
+from matplotlib.lines import Line2D
 
 class ClusterBasedDroneRouting_LocalSearch:
     def __init__(self, csv_file=None, road_points=None, n_drones=None):
@@ -176,23 +177,41 @@ class ClusterBasedDroneRouting_LocalSearch:
     # Visualization
     def visualize_cluster_routes(self, all_routes):
         plt.figure(figsize=(14, 10))
-        colors = ['red','blue','green','orange','purple','brown','pink','gray']
 
-        # Road points
+        # 🎨 Define color mapping (cluster → drone → color)
+        color_map = {
+            0: {0: "#FAB12F", 1: "#DD0303"},  # Cluster 1
+            1: {0: "#3A6F43", 1: "#FDAAAA"},  # Cluster 2
+            2: {0: "#3338A0", 1: "#C59560"},  # Cluster 3
+            3: {0: "#990099", 1: "#009999"},  # Cluster 4
+        }
+
+        legend_handles = []  # Custom legend container
+
+        # 🏠 Road points (depots)
         for i, (lat, lon) in enumerate(self.road_points):
             plt.scatter(lon, lat, c='black', s=200, marker='s', zorder=5)
-            plt.text(lon, lat, f'R{i}', ha='center', va='center', fontweight='bold', fontsize=12, color='white')
+            plt.text(lon, lat, f'R{i}', ha='center', va='center',
+                    color='white', fontweight='bold')
 
-        # Hotspots
+        # 🔥 Hotspots
         for i, (lat, lon) in enumerate(self.coordinates):
             cid = self.clusters[i]
-            plt.scatter(lon, lat, c=colors[cid % len(colors)], s=100, alpha=0.7, zorder=4)
-            plt.text(lon, lat, f'H{i}', ha='center', va='center', fontsize=8, fontweight='bold')
+            plt.scatter(lon, lat, c='gray', s=80, alpha=0.6, zorder=4)
+            plt.text(lon, lat, f'H{i}', ha='center', va='center',
+                    fontsize=8, fontweight='bold')
 
-        # Routes
+        # 🚁 Routes per cluster & drone
         for cid, routes in all_routes.items():
-            for d_idx, route in enumerate(routes):
-                if len(route) <= 1: continue
+            for d_idx, route_info in enumerate(routes):
+                if isinstance(route_info, tuple):
+                    route, _ = route_info
+                else:
+                    route = route_info
+
+                if len(route) <= 1:
+                    continue
+
                 lats, lons = [], []
                 for loc in route:
                     if loc < len(self.road_points):
@@ -201,17 +220,41 @@ class ClusterBasedDroneRouting_LocalSearch:
                         lat, lon = self.coordinates[loc - len(self.road_points)]
                     lats.append(lat)
                     lons.append(lon)
-                plt.plot(lons, lats, 'o-', color=colors[cid % len(colors)],
-                         label=f'Cluster {cid} Drone {d_idx+1}', linewidth=2, markersize=6)
-        plt.title('Drone Routes (Local Search 2-opt)')
+
+                color = color_map.get(cid, {}).get(d_idx, "black")
+                label = f'Cluster {cid+1} Drone {d_idx+1}'
+
+                plt.plot(
+                    lons, lats, 'o-',
+                    color=color,
+                    linestyle='--',
+                    linewidth=2.5,
+                    markersize=6,
+                    label=label
+                )
+
+                # Add legend handle manually for better formatting
+                legend_handles.append(Line2D(
+                    [0], [0],
+                    color=color,
+                    linestyle='--',
+                    linewidth=2.5,
+                    label=label
+                ))
+
+        # 🧾 Custom Legend
+        plt.legend(handles=legend_handles, title="Legenda Drone Routes",
+                title_fontsize=11, fontsize=9, loc='best')
+
+        # 📊 Labels & Styling
+        plt.title('Drone Routes (Local Search 2-opt)', fontsize=14, fontweight='bold')
         plt.xlabel('Longitude')
         plt.ylabel('Latitude')
-        plt.legend()
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.show()
 
-    def new_visualize_cluster_routes(self, all_routes, base_map_path="forest_fire_clusters_map.html", output_path="forest_fire_clusters_with_local_search_routes.html"):
+    def new_visualize_cluster_routes(self, all_routes, base_map_path="new_forest_fire_clusters_map.html", output_path="new_forest_fire_clusters_with_local_search_routes.html"):
         # === 1️⃣ Baca peta dasar ===
         with open(base_map_path, "r", encoding="utf-8") as f:
             html_data = f.read()
@@ -301,7 +344,7 @@ class ClusterBasedDroneRouting_LocalSearch:
 
         print(f"✅ Rute drone (Local Search Only) berhasil ditambahkan ke peta: {output_path}")
 
-    def melawi_visualize_cluster_routes(self, all_routes, base_map_path="forest_fire_clusters_map_melawi.html", output_path="forest_fire_clusters_with_local_search_routes_melawi.html"):
+    def melawi_visualize_cluster_routes(self, all_routes, base_map_path="new_forest_fire_clusters_map_melawi.html", output_path="new_forest_fire_clusters_with_local_search_routes_melawi.html"):
         # === 1️⃣ Baca peta dasar ===
         with open(base_map_path, "r", encoding="utf-8") as f:
             html_data = f.read()
@@ -317,9 +360,10 @@ class ClusterBasedDroneRouting_LocalSearch:
 
         # === 3️⃣ Warna kustom per cluster ===
         cluster_color_palettes = {
-            0: ["#432323", "#D7A86E"],  # merah tua & kuning lembut
-            1: ["#59AC77", "#6F00FF"],  # hijau muda & ungu terang
-            2: ["#F25912", "#5C3E94"],  # oranye & ungu tua
+            0: {0: "#FAB12F", 1: "#DD0303"},  # Cluster 1
+            1: {0: "#3A6F43", 1: "#FDAAAA"},  # Cluster 2
+            2: {0: "#3338A0", 1: "#C59560"},  # Cluster 3
+            3: {0: "#990099", 1: "#009999"},  # Cluster 4
         }
 
         legend_entries = []
@@ -419,3 +463,107 @@ class ClusterBasedDroneRouting_LocalSearch:
                 print(f"    Total distance: {total_distance:.2f} km")
                 print(f"    Est. flight time: {total_distance*1000/30/60:.2f} minutes")
     
+    def new_visualize_cluster_routes_ketapang(self, all_routes,
+                                base_map_path="new_forest_fire_clusters_map.html",
+                                output_path="new_ forest_fire_clusters_with_drone_routes.html"):
+
+        # === ⿡ Baca peta dasar ===
+        with open(base_map_path, "r", encoding="utf-8") as f:
+            html_data = f.read()
+
+        soup = BeautifulSoup(html_data, "html.parser")
+
+        # === ⿢ Deteksi variabel map Folium (contoh: map_fa9a...) ===
+        map_var_match = re.search(r"var\s+(map_[a-z0-9]+)\s*=", html_data)
+        if not map_var_match:
+            print("❌ Tidak ditemukan variabel peta di file HTML.")
+            return
+        map_var = map_var_match.group(1)
+        print(f"✅ Variabel peta terdeteksi: {map_var}")
+
+        # === ⿣ Warna kombinasi kustom per cluster ===
+        cluster_color_palettes = {
+            0: ["#FAB12F", "#DD0303"],
+            1: ["#3A6F43", "#FDAAAA"],
+            2: ["#3338A0", "#C59560"]
+        }
+
+        legend_entries = []
+        js_add_routes = "\n\n// === Tambahan: Drone Route Overlays ===\n"
+
+        # === ⿤ Tambahkan PolyLine putus-putus per drone ===
+        for cid, routes in all_routes.items():
+            palette = cluster_color_palettes.get(cid, ["#555555", "#AAAAAA"])  # fallback abu-abu
+            for d_idx, route in enumerate(routes):
+                if len(route) <= 1:
+                    continue
+
+                # ambil koordinat
+                latlons = []
+                for loc in route:
+                    if loc < len(self.road_points):
+                        lat, lon = self.road_points[loc]
+                    else:
+                        lat, lon = self.coordinates[loc - len(self.road_points)]
+                    latlons.append([lat, lon])
+
+                color = palette[d_idx % len(palette)]
+
+                js_add_routes += f"""
+    var droneRoute_{cid}_{d_idx} = L.polyline({latlons}, {{
+        color: '{color}',
+        weight: 3,
+        opacity: 0.9,
+        dashArray: '10, 10'  // garis putus-putus
+    }}).addTo({map_var});
+    droneRoute_{cid}_{d_idx}.bindTooltip("Cluster {cid} - Drone {d_idx+1}");
+    """
+
+                legend_entries.append((f"Cluster {cid} - Drone {d_idx+1}", color))
+
+        js_add_routes += "\n// === End of Drone Routes ===\n"
+
+        # === ⿥ Tambahkan legenda ke peta ===
+        legend_html = '''
+        <div style="
+            position: fixed; bottom: 30px; left: 20px; width: 270px;
+            background-color: white; border:2px solid grey; z-index:9999;
+            font-size:13px; padding: 10px; line-height: 1.4;">
+            <b>Legenda Rute Drone ✈</b><br>
+            <hr style="margin:4px 0;">
+        '''
+        for label, color in legend_entries:
+            legend_html += f'''
+        <div style="display:flex;align-items:center;margin-bottom:4px;">
+            <span style="
+                width:26px;
+                height:0;
+                border-top:2px dashed {color};
+                display:inline-block;
+                margin-right:8px;">
+            </span>
+            {label}
+        </div>
+        '''
+        legend_html += "<hr style='margin:6px 0;'>Garis putus-putus: Jalur Udara</div>"
+
+        js_add_routes += f"""
+    var legend = L.control({{position: 'bottomleft'}});
+    legend.onAdd = function (map) {{
+        var div = L.DomUtil.create('div', 'info legend');
+        div.innerHTML = {legend_html};
+        return div;
+    }};
+    legend.addTo({map_var});
+    """
+
+        # === ⿦ Sisipkan JS ke HTML terakhir ===
+        script_tag = soup.find_all("script")[-1]
+        script_content = script_tag.string or ""
+        script_tag.string = script_content + js_add_routes
+
+        # === ⿧ Simpan hasil baru ===
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(str(soup))
+
+        print(f"✅ Drone routes (warna kustom + legenda) berhasil ditambahkan ke peta: {output_path}")
